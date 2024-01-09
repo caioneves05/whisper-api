@@ -1,24 +1,19 @@
-FROM python:3.9
+FROM nvidia/cuda:11.7.1-runtime-ubuntu20.04
 
-# 
-WORKDIR /code
+# Install necessary dependencies
+RUN apt-get update && apt-get upgrade && apt-get install -y python3-pip
 
-RUN pip install numba --upgrade
+# Set the working directory
+WORKDIR /app
 
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get install -y ffmpeg
+# Copy the app code and requirements filed
+COPY . /app
 
-RUN pip install git+https://github.com/openai/whisper.git
+# Install the app dependencies
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# 
-COPY ./requirements.txt /code/requirements.txt
+RUN pip install nvidia-cublas-cu11 nvidia-cudnn-cu11
 
-# 
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+RUN export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__))'`
 
-# 
-COPY ./ /code/app
-
-# 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT [ "python3", "main.py" ]

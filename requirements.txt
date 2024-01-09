@@ -1,4 +1,1 @@
-uvicorn
-fastapi
-torch
-ffmpeg-python
+faster-whisper
