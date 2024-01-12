@@ -1,24 +1,40 @@
-FROM python:3.9
+# DEVELOPMENT
 
-# 
-WORKDIR /code
+FROM python:3.9 As development
 
-RUN pip install numba --upgrade
+WORKDIR /app
 
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get install -y ffmpeg
+RUN apt-get update && apt-get install -y python3
 
-RUN pip install git+https://github.com/openai/whisper.git
+RUN apt-get install -y python3-pip
 
-# 
-COPY ./requirements.txt /code/requirements.txt
+RUN apt-get install -y build-essential
 
-# 
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+COPY requirements.txt /
 
-# 
-COPY ./ /code/app
+RUN pip3 install --trusted-host pypi.python.org -r /requirements.txt
 
-# 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+COPY . .
+
+# PRODUCTION
+
+FROM python:3.9 As production
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y python3
+
+RUN apt-get install -y python3-pip
+
+RUN apt-get install -y build-essential
+
+COPY requirements.txt /
+
+RUN pip3 install --trusted-host pypi.python.org -r /requirements.txt
+
+EXPOSE 8000
+
+COPY . .
+
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "app.wsgi:app"]
