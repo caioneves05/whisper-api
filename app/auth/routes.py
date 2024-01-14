@@ -144,28 +144,36 @@ decodeMinuteInFull = {
 }
 
 def search_index_expected_peech(phrase, typeExpected, hourExpected, minuteExpected):
-    words = phrase.split()
-    typeIndex = 0
-    hourIndex = 0
-    minuteIndex = 0
+    words = phrase.split(' ')
+    filtered_none_empty = list(filter(lambda x: x != '', words))
+    typeIndex = None
+    hourIndex = None
+    minuteIndex = None
 
-    print("PHRASE", phrase)
-    print("TYPE", typeExpected)
-    print("HOUR", hourExpected)
-    print("MINUTE", minuteExpected)
+    
 
-    for index, p in enumerate(words):
+    for index, p in enumerate(filtered_none_empty):
         if p == typeExpected:
             typeIndex = index
-        if p == hourExpected:
+        if hourExpected in p:
             hourIndex = index
-        if p == minuteExpected:
+        if minuteExpected in p:
             minuteIndex = index
+    print("minute expected", minuteExpected)
+    print(filtered_none_empty)
+    print(typeIndex)
+    print(hourIndex)
+    print(minuteIndex)
 
-    if typeIndex < hourIndex and hourIndex < minuteIndex:
+    if (
+        typeIndex is not None
+        and hourIndex is not None
+        and minuteIndex is not None
+        and typeIndex < hourIndex
+        and hourIndex < minuteIndex
+    ):
         return True
-    else:
-        return False
+    return False
 
 @bp.route("/", methods=["POST"])
 def face_match():
@@ -196,29 +204,49 @@ def face_match():
         
         print(segment.text.lower())
         print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
+
+        phrase_expected = 'entrada uma hora e quarenta'
         
         #Verify TYPE input
-        if typeRegisterClockExpectedSpeech.lower() in segment.text.lower():
+        if typeRegisterClockExpectedSpeech.lower() in phrase_expected:
             
             #Verify HOUR and hour written in full
-            if hourExpectedSpeechString in segment.text.lower() or str(hourExpectedSpeechInt) in segment.text.lower() or \
-            hourExpectedSpeechStringInFullAM and hourExpectedSpeechStringInFullAM.lower() in segment.text.lower() or \
-            hourExpectedSpeechStringInFullPM and hourExpectedSpeechStringInFullPM.lower() in segment.text.lower() :
+            if (
+            (hourExpectedSpeechString is not None and hourExpectedSpeechString in phrase_expected) or
+            (str(hourExpectedSpeechInt) is not None and str(hourExpectedSpeechInt) in phrase_expected) or
+            (hourExpectedSpeechStringInFullAM is not None and hourExpectedSpeechStringInFullAM.lower() in phrase_expected) or
+            (hourExpectedSpeechStringInFullPM is not None and hourExpectedSpeechStringInFullPM.lower() in phrase_expected)
+            ):
+            
+          # Verificar MINUTE e hour written in full
+              if str(minuteExpectedSpeechInt).lower() in phrase_expected or minuteExpectedSpeechString.lower() in phrase_expected:
               
-              #Verify MINUTE and hour written in full
-              if str(minuteExpectedSpeechInt).lower() in segment.text.lower() or minuteExpectedSpeechString.lower() in segment.text.lower():
-                # print("hourExpectedSpeechString:", hourExpectedSpeechString is not None and hourExpectedSpeechString in segment.text.lower())
-                # print("hourExpectedSpeechInt:", hourExpectedSpeechInt is not None and str(hourExpectedSpeechInt) in segment.text.lower())
-                # print("hourExpectedSpeechStringInFullAM:", hourExpectedSpeechStringInFullAM is not None and hourExpectedSpeechStringInFullAM.lower() in segment.text.lower())
-                # print("hourExpectedSpeechStringInFullPM:", hourExpectedSpeechStringInFullPM is not None and hourExpectedSpeechStringInFullPM.lower() in segment.text.lower())
-                # print("minuteExpectedSpeechInt:", str(minuteExpectedSpeechInt) is not None and str(minuteExpectedSpeechInt).lower().lower() in segment.text.lower())
-                # print("minuteExpectedSpeechString:", minuteExpectedSpeechString is not None and minuteExpectedSpeechString.lower().lower() in segment.text.lower())
+                hour_found = None
+                minute_found = None
 
-                parametersIsValid = search_index_expected_peech(segment.text.lower(), typeRegisterClockExpectedSpeech.lower(), hourExpectedSpeechInt, str(minuteExpectedSpeechInt))
+                # Verificar e armazenar HOUR
+                if hourExpectedSpeechString is not None and hourExpectedSpeechString in phrase_expected:
+                    hour_found = hourExpectedSpeechString
+                elif hourExpectedSpeechInt is not None and str(hourExpectedSpeechInt) in phrase_expected:
+                    hour_found = str(hourExpectedSpeechInt)
+                elif hourExpectedSpeechStringInFullAM is not None and hourExpectedSpeechStringInFullAM.lower() in phrase_expected:
+                    hour_found = hourExpectedSpeechStringInFullAM
+                elif hourExpectedSpeechStringInFullPM is not None and hourExpectedSpeechStringInFullPM.lower() in phrase_expected:
+                    hour_found = hourExpectedSpeechStringInFullPM
+                
+                # Verificar e armazenar MINUTE
+                if minuteExpectedSpeechInt is not None and str(minuteExpectedSpeechInt).lower() in phrase_expected:
+                    minute_found = str(minuteExpectedSpeechInt)
+                elif minuteExpectedSpeechString is not None and minuteExpectedSpeechString.lower() in phrase_expected:
+                    minute_found = minuteExpectedSpeechString
 
-                print("CAIO", parametersIsValid)
-                return json.dumps({"validated": True, "spoken_text_in_audio": segment.text})
-              
+                parametersIsValid = search_index_expected_peech(phrase_expected, typeRegisterClockExpectedSpeech.lower(), hour_found, minute_found)
+
+                if parametersIsValid == True:
+                  return json.dumps({"validated": True, "spoken_text_in_audio": segment.text})
+                else:
+                  return json.dumps({"validated": False, "spoken_text_in_audio": segment.text})
+                          
               else:
                 return json.dumps({"validated": False, "spoken_text_in_audio": segment.text})
             
