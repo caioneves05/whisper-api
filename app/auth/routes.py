@@ -40,43 +40,43 @@ decodeHour = {
 decodeHourInFullAM = {
     "00": "Meia Noite",
     "12": "Meio Dia",
-    "1": "Uma Hora",
-    "2": "Duas Horas",
-    "3": "Três Horas",
-    "4": "Quatro Horas",
-    "5": "Cinco Horas",
-    "6": "Seis Horas",
-    "7": "Sete Horas",
-    "8": "Oito Horas",
-    "9": "Nove Horas",
-    "10": "Dez Horas",
-    "11": "Onze Horas",
-    "12": "Doze Horas",
-    "13": "Treze Horas",
-    "14": "Quatorze Horas",
-    "15": "Quinze Horas",
-    "16": "Dezesseis Horas",
-    "17": "Dezessete Horas",
-    "18": "Dezoito Horas",
-    "19": "Dezenove Horas",
-    "20": "Vinte Horas",
-    "21": "Vinte e Uma Horas",
-    "22": "Vinte e Duas Horas",
-    "23": "Vinte e Três Horas",
+    "1": "Uma",
+    "2": "Duas",
+    "3": "Três",
+    "4": "Quatro",
+    "5": "Cinco",
+    "6": "Seis",
+    "7": "Sete",
+    "8": "Oito",
+    "9": "Nove",
+    "10": "Dez",
+    "11": "Onze",
+    "12": "Doze",
+    "13": "Treze",
+    "14": "Quatorze",
+    "15": "Quinze",
+    "16": "Dezesseis",
+    "17": "Dezessete",
+    "18": "Dezoito",
+    "19": "Dezenove",
+    "20": "Vinte",
+    "21": "Vinte e Uma",
+    "22": "Vinte e Duas",
+    "23": "Vinte e Três",
 }
 
 decodeHourInFullPM = {
-  "13": "Uma Hora",
-  "14": "Duas Horas",
-  "15": "Três Horas",
-  "16": "Quatro Horas",
-  "17": "Cinco Horas",
-  "18": "Seis Horas",
-  "19": "Sete Horas",
-  "20": "Oito Horas",
-  "21": "Nove Horas",
-  "22": "Dez Horas",
-  "23": "Onze Horas",
+  "13": "Uma",
+  "14": "Duas",
+  "15": "Três",
+  "16": "Quatro",
+  "17": "Cinco",
+  "18": "Seis",
+  "19": "Sete",
+  "20": "Oito",
+  "21": "Nove",
+  "22": "Dez",
+  "23": "Onze",
 }
 
 decodeMinuteInFull = {
@@ -159,11 +159,10 @@ def search_index_expected_peech(phrase, typeExpected, hourExpected, minuteExpect
             hourIndex = index
         if minuteExpected in p:
             minuteIndex = index
-    print("minute expected", minuteExpected)
+    print(typeExpected)
+    print(hourExpected)
+    print(minuteExpected)
     print(filtered_none_empty)
-    print(typeIndex)
-    print(hourIndex)
-    print(minuteIndex)
 
     if (
         typeIndex is not None
@@ -205,7 +204,7 @@ def face_match():
         print(segment.text.lower())
         print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
 
-        phrase_expected = 'entrada uma hora e quarenta'
+        phrase_expected = segment.text.lower()
         
         #Verify TYPE input
         if typeRegisterClockExpectedSpeech.lower() in phrase_expected:
@@ -224,21 +223,21 @@ def face_match():
                 hour_found = None
                 minute_found = None
 
-                # Verificar e armazenar HOUR
+                # Check and save the HOUR
                 if hourExpectedSpeechString is not None and hourExpectedSpeechString in phrase_expected:
-                    hour_found = hourExpectedSpeechString
+                    hour_found = hourExpectedSpeechString.lower()
                 elif hourExpectedSpeechInt is not None and str(hourExpectedSpeechInt) in phrase_expected:
-                    hour_found = str(hourExpectedSpeechInt)
+                    hour_found = str(hourExpectedSpeechInt).lower()
                 elif hourExpectedSpeechStringInFullAM is not None and hourExpectedSpeechStringInFullAM.lower() in phrase_expected:
-                    hour_found = hourExpectedSpeechStringInFullAM
+                    hour_found = hourExpectedSpeechStringInFullAM.lower()
                 elif hourExpectedSpeechStringInFullPM is not None and hourExpectedSpeechStringInFullPM.lower() in phrase_expected:
-                    hour_found = hourExpectedSpeechStringInFullPM
+                    hour_found = hourExpectedSpeechStringInFullPM.lower()
                 
-                # Verificar e armazenar MINUTE
+                # Check and save the MINUTE
                 if minuteExpectedSpeechInt is not None and str(minuteExpectedSpeechInt).lower() in phrase_expected:
-                    minute_found = str(minuteExpectedSpeechInt)
+                    minute_found = str(minuteExpectedSpeechInt).lower()
                 elif minuteExpectedSpeechString is not None and minuteExpectedSpeechString.lower() in phrase_expected:
-                    minute_found = minuteExpectedSpeechString
+                    minute_found = minuteExpectedSpeechString.lower()
 
                 parametersIsValid = search_index_expected_peech(phrase_expected, typeRegisterClockExpectedSpeech.lower(), hour_found, minute_found)
 
