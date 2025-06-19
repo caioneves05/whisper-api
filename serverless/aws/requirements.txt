@@ -1,0 +1,5 @@
+whisper==1.1.10
+faster-whisper==0.10.0
+Flask>=1.1.2
+serverless-wsgi>=2.0.2
+requests==2.31.0

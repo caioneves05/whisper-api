@@ -33,8 +33,9 @@ COPY requirements.txt /
 
 RUN pip3 install --trusted-host pypi.python.org -r /requirements.txt
 
+
 EXPOSE 8000
 
 COPY . .
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "app.wsgi:app"]
+CMD ["gunicorn", "-k", "gevent", "-b", "0.0.0.0:8000", "app.wsgi:app"]

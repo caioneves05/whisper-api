@@ -1,15 +1,8 @@
-import logging
-from faster_whisper import WhisperModel
-
+import base64
 import json
+import os
 
-from flask import request
-from app.auth import bp
-
-logging.basicConfig()
-logging.getLogger("faster_whisper").setLevel(logging.DEBUG)
-
-model_size = "small"
+from faster_whisper import WhisperModel
 
 decodeHour = {
   "13": "1",
@@ -23,7 +16,7 @@ decodeHour = {
   "21": "9",
   "22": "10",
   "23": "11",
-
+  "00": "0",
   "1": "13",
   "2": "14",
   "3": "15",
@@ -37,9 +30,13 @@ decodeHour = {
   "11": "23",
 }
 
+decodeHourInFullSurname = {
+   "12": "meio",
+   "00": "meia"
+}
+
 decodeHourInFullAM = {
-    "00": "Meia Noite",
-    "12": "Meio Dia",
+    "00": "Zero",
     "1": "Uma",
     "2": "Duas",
     "3": "Três",
@@ -140,30 +137,44 @@ decodeMinuteInFull = {
   "58": "Cinquenta e oito",
   "59": "Cinquenta e nove",
   "60": "Sessenta",
-
 }
 
-def search_index_expected_peech(phrase, typeExpected, hourExpected, minuteExpected):
+def flatten(iter):
+  new_list = []
+  for sub_list in iter:
+    for item in sub_list:
+        new_list.append(item)
+  return new_list
+
+def search_index_expected_speech(phrase, typeExpected, hourExpected, minuteExpected):
+
     words = phrase.split(' ')
-    filtered_none_empty = list(filter(lambda x: x != '', words))
+    filtered_not_empty = list(filter(lambda x: x != '', words))
+
+
     typeIndex = None
     hourIndex = None
     minuteIndex = None
 
-    
-
-    for index, p in enumerate(filtered_none_empty):
-        if p == typeExpected:
+    for index, p in enumerate(filtered_not_empty):
+        if typeExpected in p:
             typeIndex = index
-        if hourExpected in p:
-            hourIndex = index
-        if minuteExpected in p:
+        if hourExpected in p :
+            if hourIndex == None:
+               hourIndex = index
+        if hourExpected and minuteExpected in p:
             minuteIndex = index
-    print(typeExpected)
-    print(hourExpected)
-    print(minuteExpected)
-    print(filtered_none_empty)
-
+    
+    if hourIndex < minuteIndex or hourIndex == minuteIndex:
+      # if phrase same "ENTRADA 1340"
+      value_with_expected = [item for item in filtered_not_empty if hourExpected in item][0]
+      
+      index_hour = value_with_expected.find(hourExpected)
+      index_minute = value_with_expected.find(minuteExpected)
+      
+      if index_hour < index_minute:
+        return True
+                   
     if (
         typeIndex is not None
         and hourIndex is not None
@@ -171,21 +182,45 @@ def search_index_expected_peech(phrase, typeExpected, hourExpected, minuteExpect
         and typeIndex < hourIndex
         and hourIndex < minuteIndex
     ):
-        return True
+      return True
     return False
 
-@bp.route("/", methods=["POST"])
-def face_match():
-  if request.method == "POST":
-    # Input parameters of route
-    audio = request.files.get("audio")
-    expectedSpeech = request.form.get("expected_speech")
 
-    if ("audio" in request.files and "expected_speech" in request.form):
-      
+current_directory = os.getcwd()
+
+path_models = os.getenv('PATH_MODELS')
+
+model = WhisperModel('tmp/small', device="cpu", compute_type="int8", local_files_only=True,)
+
+
+def decode_base64_audio(base64_string, output_file_path):
+  decoded_data = base64.b64decode(base64_string)
+  
+  with open(output_file_path, "wb") as audio_file:
+      audio_file.write(decoded_data)
+
+def handler(event, context):
+    
+    if not event['body']:
+      return{
+                  "statusCode": 400,
+                  "body": {
+                    "message": "body bad"
+                  }
+              }
+    
+    if 'body' in event:
+
+      decoded_body = base64.b64decode(event['body']).decode('utf-8')
+      body_dict = json.loads(decoded_body)
+
+      expectedSpeech = body_dict['expected_speech']
+
+      audio_path = os.path.join(os.path.dirname(__file__), "/tmp/audio.wav")
+      decode_base64_audio(body_dict['audio'], audio_path)
+
+      segments, info = model.transcribe(audio_path, beam_size=1, patience=2, language='pt', vad_filter=True, vad_parameters=dict(min_silence_duration_ms=500))
       # Library with responsible to transcription audio
-      model = WhisperModel(model_size, device="cpu", compute_type="int8")
-      segments, info = model.transcribe(audio, beam_size=1, patience=2, language='pt', vad_filter=True, vad_parameters=dict(min_silence_duration_ms=500),)
       print("Detected language '%s' with probability %f" % (info.language, info.language_probability))
 
       # Formated inputs
@@ -197,15 +232,12 @@ def face_match():
       hourExpectedSpeechString = decodeHour.get(str(hourExpectedSpeechInt))
       hourExpectedSpeechStringInFullAM = decodeHourInFullAM.get(str(hourExpectedSpeechInt))
       hourExpectedSpeechStringInFullPM = decodeHourInFullPM.get(str(hourExpectedSpeechInt))
+      hourExpectedSpeechStringInFullSurname = decodeHourInFullSurname.get(expectedSpeech.split(' ')[1])
       minuteExpectedSpeechString = decodeMinuteInFull.get(str(minuteExpectedSpeechInt))
-
       for segment in segments:
         
-        print(segment.text.lower())
-        print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
-
+        # print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
         phrase_expected = segment.text.lower()
-        
         #Verify TYPE input
         if typeRegisterClockExpectedSpeech.lower() in phrase_expected:
             
@@ -214,10 +246,11 @@ def face_match():
             (hourExpectedSpeechString is not None and hourExpectedSpeechString in phrase_expected) or
             (str(hourExpectedSpeechInt) is not None and str(hourExpectedSpeechInt) in phrase_expected) or
             (hourExpectedSpeechStringInFullAM is not None and hourExpectedSpeechStringInFullAM.lower() in phrase_expected) or
-            (hourExpectedSpeechStringInFullPM is not None and hourExpectedSpeechStringInFullPM.lower() in phrase_expected)
+            (hourExpectedSpeechStringInFullPM is not None and hourExpectedSpeechStringInFullPM.lower() in phrase_expected) or
+            (hourExpectedSpeechStringInFullSurname is not None and hourExpectedSpeechStringInFullSurname.lower() in phrase_expected)
             ):
-            
-          # Verificar MINUTE e hour written in full
+
+          # Verify MINUTE e hour written in full
               if str(minuteExpectedSpeechInt).lower() in phrase_expected or minuteExpectedSpeechString.lower() in phrase_expected:
               
                 hour_found = None
@@ -232,6 +265,8 @@ def face_match():
                     hour_found = hourExpectedSpeechStringInFullAM.lower()
                 elif hourExpectedSpeechStringInFullPM is not None and hourExpectedSpeechStringInFullPM.lower() in phrase_expected:
                     hour_found = hourExpectedSpeechStringInFullPM.lower()
+                elif hourExpectedSpeechStringInFullSurname is not None and hourExpectedSpeechStringInFullSurname.lower() in phrase_expected:
+                  hour_found = hourExpectedSpeechStringInFullSurname.lower()
                 
                 # Check and save the MINUTE
                 if minuteExpectedSpeechInt is not None and str(minuteExpectedSpeechInt).lower() in phrase_expected:
@@ -239,25 +274,44 @@ def face_match():
                 elif minuteExpectedSpeechString is not None and minuteExpectedSpeechString.lower() in phrase_expected:
                     minute_found = minuteExpectedSpeechString.lower()
 
-                parametersIsValid = search_index_expected_peech(phrase_expected, typeRegisterClockExpectedSpeech.lower(), hour_found, minute_found)
-
+                parametersIsValid = search_index_expected_speech(phrase_expected, typeRegisterClockExpectedSpeech.lower(), hour_found, minute_found)
                 if parametersIsValid == True:
-                  return json.dumps({"validated": True, "spoken_text_in_audio": segment.text})
+                  return{
+                      "statusCode": 200,
+                      "body": {
+                        "validated": True, "spoken_text_in_audio": segment.text
+                      }
+                  }
                 else:
-                  return json.dumps({"validated": False, "spoken_text_in_audio": segment.text})
-                          
+                  return{
+                      "statusCode": 200,
+                      "body": {
+                        "validated": False, "spoken_text_in_audio": segment.text
+                      }
+                  }
               else:
-                return json.dumps({"validated": False, "spoken_text_in_audio": segment.text})
-            
+                return{
+                      "statusCode": 200,
+                      "body": {
+                        "validated": False, "spoken_text_in_audio": segment.text
+                      }
+                  }
             else:
-              return json.dumps({"validated": False, "spoken_text_in_audio": segment.text})
-        
+              return{
+                      "statusCode": 200,
+                      "body": {
+                        "validated": False, "spoken_text_in_audio": segment.text
+                      }
+                  }
         else:
-          return json.dumps({"validated": False, "spoken_text_in_audio": segment.text})
-      
-
-
-      # return json.dumps({"language": segments.text})
-    else:
-      
-      return json.dumps({'message': 'audio or expected_speech not found'}), 400, {'ContentType':'application/json'}
+          return{
+                      "statusCode": 200,
+                      "body": {
+                        "validated": False, "spoken_text_in_audio": segment.text
+                      }
+                  }
+    else: 
+       return {
+            "statusCode": 400,
+            "body": event
+        }
